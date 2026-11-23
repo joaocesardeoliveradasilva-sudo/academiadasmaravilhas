@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Alunos | AcademiaFit</title>
+  <link rel="stylesheet" href="../css/prof.css">
+</head>
+<body>
+<nav class="navbar"><div class="logo-container"><span class="logo-icon">🏋️</span><span class="brand-name">AcademiaFit</span></div><ul class="nav-links"><li><a href="paginainicial.html">Dashboard</a></li><li><a class="active" href="aluno.html">Alunos</a></li><li><a href="prof.html">Professores</a></li><li><a href="planos.html">Planos</a></li><li><a href="pagamentos.html">Pagamentos</a></li><li><a href="treino.html">Treinos</a></li><li><a href="login.html" data-sair>Sair</a></li></ul></nav>
+<main class="main-container"><section class="form-container"><h1 class="form-title">Cadastrar aluno</h1><form id="form-aluno"><div class="form-grid"><div class="form-group"><label for="nome">Nome completo</label><input id="nome" required></div><div class="form-group"><label for="email">E-mail</label><input id="email" type="email"></div><div class="form-group"><label for="telefone">Telefone</label><input id="telefone" type="tel"></div><div class="form-group"><label for="idade">Idade</label><input id="idade" type="number" min="1" max="120"></div></div><button class="btn-submit" type="submit">Cadastrar aluno</button><p class="status-message" id="status"></p></form></section><h2 class="section-title">Alunos cadastrados</h2><div class="table-container"><table class="data-table"><thead><tr><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Idade</th></tr></thead><tbody id="lista"><tr><td colspan="4" class="empty-message">Carregando...</td></tr></tbody></table></div></main>
+<script>
+const lista=document.querySelector('#lista');
+async function carregar(){try{const r=await fetch('/api/alunos');const dados=await r.json();lista.innerHTML=dados.length?'':'<tr><td colspan="4" class="empty-message">Nenhum aluno cadastrado.</td></tr>';dados.forEach(a=>{lista.insertAdjacentHTML('beforeend',`<tr><td>${a.nome}</td><td>${a.email||'-'}</td><td>${a.telefone||'-'}</td><td>${a.idade||'-'}</td></tr>`)});}catch(e){lista.innerHTML='<tr><td colspan="4" class="empty-message">Erro ao carregar alunos.</td></tr>';}}document.querySelector('#form-aluno').addEventListener('submit',async e=>{e.preventDefault();const status=document.querySelector('#status');const body={nome:nome.value.trim(),email:email.value.trim(),telefone:telefone.value.trim(),idade:idade.value||null};const r=await fetch('/api/alunos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();status.textContent=d.erro||d.mensagem;if(r.ok){e.target.reset();carregar();}});carregar();
+</script>
+<script src="acesso.js"></script>
+</body>
+</html>

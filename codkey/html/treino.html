@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcademiaFit - Treinos</title>
+    <!-- Vinculando o mesmo arquivo CSS centralizado -->
+    <link rel="stylesheet" href="../css/prof.css">
+</head>
+<body>
+
+    <!-- BARRA DE NAVEGAÇÃO -->
+    <nav class="navbar">
+        <div class="logo-container">
+            <span class="logo-icon">🏋️</span>
+            <span class="brand-name">AcademiaFit</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="paginainicial.html">Dashboard</a></li>
+            <li><a href="aluno.html">Alunos</a></li>
+            <li><a href="prof.html">Professores</a></li>
+            <li><a href="planos.html">Planos</a></li>
+            <li><a href="pagamentos.html">Pagamentos</a></li>
+            <li><a href="treino.html" class="active">Treinos</a></li>
+            <li><a href="login.html" data-sair>Sair</a></li>
+        </ul>
+    </nav>
+
+    <!-- CONTEÚDO DA PÁGINA -->
+    <main class="main-container">
+        
+        <!-- Bloco do Formulário de Cadastro de Treino -->
+        <section class="form-container">
+            <h2 class="form-title">Cadastrar Treino</h2>
+            <form id="workout-form">
+                <div class="form-group">
+                    <label for="nome-treino">Nome do Treino</label>
+                    <input type="text" id="nome-treino" placeholder="Ex: Treino A - Hipertrofia Peito" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="aluno-treino">Aluno</label>
+                    <select id="aluno-treino" required>
+                        <option value="">Selecione um aluno</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="professor-treino">Professor Responsável</label>
+                    <select id="professor-treino" required>
+                        <option value="">Nenhum professor selecionado</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="divisao">Divisão / Frequência</label>
+                    <input type="text" id="divisao" placeholder="Ex: ABCDE, 3x por semana" required>
+                </div>
+                
+                <button type="submit" class="btn-submit">Cadastrar</button>
+            </form>
+        </section>
+
+        <!-- Bloco de Treinos Cadastrados -->
+        <h2 class="section-title">Treinos cadastrados</h2>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Treino</th>
+                        <th>Aluno</th>
+                        <th>Professor Responsável</th>
+                        <th>Divisão</th>
+                    </tr>
+                </thead>
+                <tbody id="workout-list">
+                    <!-- As linhas com a listagem de treinos entrarão aqui -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+    <script>
+const alunoTreino=document.querySelector('#aluno-treino');const professorTreino=document.querySelector('#professor-treino');const treinoTabela=document.querySelector('.data-table tbody');
+async function carregarOpcoesTreino(perfil){const ra=await fetch('/api/alunos');const alunos=await ra.json();alunos.forEach(a=>alunoTreino.insertAdjacentHTML('beforeend',`<option value="${a.id}">${a.nome}</option>`));if(perfil==='admin'){const rp=await fetch('/api/professores');const professores=await rp.json();professores.forEach(p=>professorTreino.insertAdjacentHTML('beforeend',`<option value="${p.id}">${p.nome}</option>`));}}
+async function carregarTreinos(){const r=await fetch('/api/treinos');const dados=await r.json();treinoTabela.innerHTML=dados.length?'':'<tr><td colspan="4" class="empty-message">Nenhum treino cadastrado.</td></tr>';dados.forEach(t=>treinoTabela.insertAdjacentHTML('beforeend',`<tr><td>${t.nome}</td><td>${t.aluno}</td><td>${t.professor||'-'}</td><td>${t.divisao||'-'}</td></tr>`));}
+document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();const body={nome:document.querySelector('#nome-treino').value.trim(),aluno_id:alunoTreino.value,professor_id:professorTreino.value,divisao:document.querySelector('#divisao').value.trim(),descricao:document.querySelector('#divisao').value.trim()};const r=await fetch('/api/treinos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(r.ok){e.target.reset();carregarTreinos()}else alert(d.erro||'Não foi possível cadastrar.')});
+fetch('/api/sessao').then(async r=>{if(!r.ok){window.location.href='login.html';return null}return r.json()}).then(async d=>{if(!d)return;const perfil=d.usuario.perfil;if(perfil==='aluno')document.querySelector('.form-container').hidden=true;if(perfil==='professor'){professorTreino.closest('.form-group').hidden=true;professorTreino.required=false;}if(perfil!=='aluno')await carregarOpcoesTreino(perfil);await carregarTreinos()}).catch(erro=>{console.error(erro);alert('Não foi possível carregar alunos e treinos. Tente novamente.')});
+</script>
+<script src="acesso.js"></script>
+</body>
+</html>

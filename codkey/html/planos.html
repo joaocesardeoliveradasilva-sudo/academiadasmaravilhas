@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AcademiaFit - Planos</title>
+    <!-- Vinculando o mesmo arquivo CSS -->
+    <link rel="stylesheet" href="../css/prof.css">
+</head>
+<body>
+
+    <!-- BARRA DE NAVEGAÇÃO -->
+    <nav class="navbar">
+        <div class="logo-container">
+            <span class="logo-icon">🏋️</span>
+            <span class="brand-name">AcademiaFit</span>
+        </div>
+        <ul class="nav-links">
+            <li><a href="paginainicial.html">Dashboard</a></li>
+            <li><a href="aluno.html">Alunos</a></li>
+            <li><a href="prof.html">Professores</a></li>
+            <li><a href="planos.html" class="active">Planos</a></li>
+            <li><a href="pagamentos.html">Pagamentos</a></li>
+            <li><a href="treino.html">Treinos</a></li>
+            <li><a href="login.html" data-sair>Sair</a></li>
+        </ul>
+    </nav>
+
+    <!-- CONTEÚDO DA PÁGINA -->
+    <main class="main-container">
+        
+        <!-- Bloco do Formulário de Cadastro -->
+        <section class="form-container">
+            <h2 class="form-title">Cadastrar Plano</h2>
+            <form id="plan-form">
+                <div class="form-group">
+                    <label for="nome-plano">Nome do Plano</label>
+                    <input type="text" id="nome-plano" placeholder="Ex: Plano Mensal, Plano Anual" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="valor">Valor (R$)</label>
+                    <input type="text" id="valor" placeholder="Ex: 89,90" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="duracao">Duração (Meses)</label>
+                    <input type="number" id="duracao" placeholder="Ex: 1, 12" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="descricao">Descrição / Benefícios</label>
+                    <input type="text" id="descricao" placeholder="Ex: Acesso livre a musculação e área cardio" required>
+                </div>
+                
+                <button type="submit" class="btn-submit">Cadastrar</button>
+            </form>
+        </section>
+
+        <!-- Bloco de Planos Cadastrados -->
+        <h2 class="section-title">Planos cadastrados</h2>
+        <div class="table-container">
+            <table class="data-table" id="plan-table">
+                <thead>
+                    <tr>
+                        <th>Nome do Plano</th>
+                        <th>Valor</th>
+                        <th>Duração</th>
+                        <th>Descrição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- As linhas com os dados dos planos entrarão aqui -->
+                </tbody>
+            </table>
+        </div>
+
+    </main>
+
+    <script>
+const planoTabela=document.querySelector('.data-table tbody');
+let perfilUsuario;
+async function carregarPlanos(){const r=await fetch('/api/planos');const dados=await r.json();const aluno=perfilUsuario==='aluno';planoTabela.innerHTML=dados.length?'':`<tr><td colspan="${aluno?5:4}" class="empty-message">Nenhum plano cadastrado.</td></tr>`;if(aluno)document.querySelector('.data-table thead tr').insertAdjacentHTML('beforeend','<th>Ação</th>');dados.forEach(p=>planoTabela.insertAdjacentHTML('beforeend',`<tr><td>${p.nome}</td><td>R$ ${Number(p.preco).toLocaleString('pt-BR',{minimumFractionDigits:2})}</td><td>${p.duracao?p.duracao+' meses':'-'}</td><td>${p.descricao||'-'}</td>${aluno?`<td><button class="btn-submit" type="button" data-plano="${p.id}">Contratar</button></td>`:''}</tr>`));}
+document.querySelector('form').addEventListener('submit',async e=>{e.preventDefault();const body={nome:document.querySelector('#nome-plano').value.trim(),preco:document.querySelector('#valor').value,duracao:document.querySelector('#duracao').value,descricao:document.querySelector('#descricao').value.trim()};const r=await fetch('/api/planos',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const d=await r.json();if(r.ok){e.target.reset();carregarPlanos()}else alert(d.erro||'Não foi possível cadastrar.')});
+planoTabela.addEventListener('click',async e=>{const botao=e.target.closest('[data-plano]');if(!botao)return;const r=await fetch('/api/contratar-plano',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({plano_id:botao.dataset.plano})});const d=await r.json();alert(d.mensagem||d.erro||'Não foi possível solicitar o plano.')});
+fetch('/api/sessao').then(async r=>{if(!r.ok){window.location.href='login.html';return null}return r.json()}).then(d=>{if(!d)return;perfilUsuario=d.usuario.perfil;if(perfilUsuario==='aluno')document.querySelector('.form-container').hidden=true;return carregarPlanos()}).catch(erro=>{console.error(erro);alert('Não foi possível carregar os planos. Tente novamente.')});
+</script>
+<script src="acesso.js"></script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | AcademiaFit</title>
+  <link rel="stylesheet" href="../css/prof.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="logo-container">
+    <span class="logo-icon">🏋️</span>
+    <span class="brand-name">AcademiaFit</span>
+  </div>
+  <ul class="nav-links">
+    <li><a class="active" href="paginainicial.html">Dashboard</a></li>
+    <li><a href="aluno.html">Alunos</a></li>
+    <li><a href="prof.html">Professores</a></li>
+    <li><a href="planos.html">Planos</a></li>
+    <li><a href="pagamentos.html">Pagamentos</a></li>
+    <li><a href="treino.html">Treinos</a></li>
+    <li><a href="login.html" data-sair>Sair</a></li>
+  </ul>
+</nav>
+<main class="main-container">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Painel administrativo</p>
+      <h1>Dashboard</h1>
+      <p>Visão geral da AcademiaFit</p>
+    </div>
+  </header>
+  <section class="cards-grid">
+    <article class="stat-card purple">
+      <span>👥</span>
+      <div>
+        <small>Alunos</small>
+        <strong id="alunos">0</strong>
+      </div>
+    </article>
+    <article class="stat-card orange">
+      <span>🎓</span>
+      <div>
+        <small>Professores</small>
+        <strong id="professores">0</strong>
+      </div>
+    </article>
+    <article class="stat-card green">
+      <span>💳</span>
+      <div>
+        <small>Planos</small>
+        <strong id="planos">0</strong>
+      </div>
+    </article>
+    <article class="stat-card blue">
+      <span>💰</span>
+      <div>
+        <small>Pagamentos</small>
+        <strong id="pagamentos">0</strong>
+      </div>
+    </article>
+    <article class="stat-card pink">
+      <span>📋</span>
+      <div>
+        <small>Treinos</small>
+        <strong id="treinos">0</strong>
+      </div>
+    </article>
+  </section>
+</main>
+<script>
+  fetch('/api/dashboard')
+    .then(r => r.json())
+    .then(d => Object.keys(d).forEach(chave => {
+      const el = document.getElementById(chave);
+      if (el) el.textContent = d[chave]
+    }))
+    .catch(() => {});
+</script>
+<script src="acesso.js"></script>
+</body>
+</html>
