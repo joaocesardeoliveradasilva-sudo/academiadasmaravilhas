@@ -14,7 +14,7 @@
 
   const dados = await resposta.json();
   const paginasPermitidas = {
-    admin: ['paginainicial.html', 'aluno.html', 'prof.html', 'planos.html', 'pagamentos.html', 'treino.html'],
+    admin: ['paginainicial.html', 'aluno.html', 'prof.html', 'planos.html', 'pagamentos.html', 'treino.html', 'usuarios.html'],
     professor: ['aluno.html', 'treino.html'],
     aluno: ['planos.html', 'treino.html']
   };

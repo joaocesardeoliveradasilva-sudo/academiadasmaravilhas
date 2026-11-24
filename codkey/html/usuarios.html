@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuários | AcademiaFit</title>
+  <link rel="stylesheet" href="../css/prof.css">
+</head>
+<body>
+<nav class="navbar">
+  <div class="logo-container">
+    <span class="logo-icon">🏋️</span>
+    <span class="brand-name">AcademiaFit</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="paginainicial.html">Dashboard</a></li>
+    <li><a href="aluno.html">Alunos</a></li>
+    <li><a href="prof.html">Professores</a></li>
+    <li><a href="planos.html">Planos</a></li>
+    <li><a href="pagamentos.html">Pagamentos</a></li>
+    <li><a href="treino.html">Treinos</a></li>
+    <li><a class="active" href="usuarios.html">Usuários</a></li>
+    <li><a href="login.html" data-sair>Sair</a></li>
+  </ul>
+</nav>
+
+<main class="main-container">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Área administrativa</p>
+      <h1>Usuários e cargos</h1>
+      <p>Gerencie os níveis de acesso do sistema.</p>
+    </div>
+  </header>
+
+  <section class="form-container">
+    <h2 class="form-title">Cadastrar usuário</h2>
+    <form id="form-usuario">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="nome-usuario">Nome completo</label>
+          <input id="nome-usuario" required>
+        </div>
+        <div class="form-group">
+          <label for="email-usuario">E-mail</label>
+          <input id="email-usuario" type="email" required>
+        </div>
+        <div class="form-group">
+          <label for="senha-usuario">Senha inicial</label>
+          <input id="senha-usuario" type="password" minlength="6" required>
+        </div>
+        <div class="form-group">
+          <label for="perfil-usuario">Cargo</label>
+          <select id="perfil-usuario" required>
+            <option value="aluno">Aluno</option>
+            <option value="professor">Professor</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-submit" type="submit">Cadastrar usuário</button>
+      <p class="status-message" id="status-usuario"></p>
+    </form>
+  </section>
+
+  <section class="table-container">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Nome</th>
+          <th>E-mail</th>
+          <th>Cargo atual</th>
+          <th>Alterar cargo</th>
+        </tr>
+      </thead>
+      <tbody id="lista-usuarios">
+        <tr><td colspan="4" class="empty-message">Carregando usuários...</td></tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+const listaUsuarios = document.querySelector('#lista-usuarios');
+const nomesPerfis = { admin: 'Administrador', professor: 'Professor', aluno: 'Aluno' };
+
+function adicionarLinha(usuario) {
+  const linha = document.createElement('tr');
+
+  const nome = document.createElement('td');
+  nome.textContent = usuario.nome;
+  const email = document.createElement('td');
+  email.textContent = usuario.email;
+  const atual = document.createElement('td');
+  atual.textContent = nomesPerfis[usuario.perfil] || usuario.perfil;
+
+  const acao = document.createElement('td');
+  const seletor = document.createElement('select');
+  seletor.className = 'form-control';
+  seletor.dataset.usuario = usuario.id;
+
+  ['aluno', 'professor', 'admin'].forEach(perfil => {
+    const opcao = document.createElement('option');
+    opcao.value = perfil;
+    opcao.textContent = nomesPerfis[perfil];
+    opcao.selected = perfil === usuario.perfil;
+    seletor.appendChild(opcao);
+  });
+
+  acao.appendChild(seletor);
+  linha.append(nome, email, atual, acao);
+  listaUsuarios.appendChild(linha);
+}
+
+async function carregarUsuarios() {
+  try {
+    const resposta = await fetch('/api/usuarios');
+    const dados = await resposta.json();
+    if (!resposta.ok) throw new Error(dados.erro || 'Não foi possível carregar os usuários.');
+
+    listaUsuarios.innerHTML = '';
+    if (!dados.length) {
+      listaUsuarios.innerHTML = '<tr><td colspan="4" class="empty-message">Nenhum usuário cadastrado.</td></tr>';
+      return;
+    }
+    dados.forEach(adicionarLinha);
+  } catch (erro) {
+    listaUsuarios.innerHTML = '';
+    const linha = document.createElement('tr');
+    const celula = document.createElement('td');
+    celula.colSpan = 4;
+    celula.className = 'empty-message';
+    celula.textContent = erro.message;
+    linha.appendChild(celula);
+    listaUsuarios.appendChild(linha);
+  }
+}
+
+listaUsuarios.addEventListener('change', async event => {
+  const seletor = event.target.closest('[data-usuario]');
+  if (!seletor) return;
+
+  const usuarioId = seletor.dataset.usuario;
+  const resposta = await fetch('/api/usuarios', {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id: usuarioId, perfil: seletor.value })
+  });
+  const dados = await resposta.json();
+
+  if (!resposta.ok) {
+    alert(dados.erro || 'Não foi possível atualizar o cargo.');
+    await carregarUsuarios();
+    return;
+  }
+
+  alert(dados.mensagem);
+  await carregarUsuarios();
+});
+
+document.querySelector('#form-usuario').addEventListener('submit', async event => {
+  event.preventDefault();
+
+  const status = document.querySelector('#status-usuario');
+  const body = {
+    nome: document.querySelector('#nome-usuario').value.trim(),
+    email: document.querySelector('#email-usuario').value.trim(),
+    senha: document.querySelector('#senha-usuario').value,
+    perfil: document.querySelector('#perfil-usuario').value
+  };
+
+  status.textContent = 'Cadastrando...';
+  try {
+    const resposta = await fetch('/api/usuarios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const dados = await resposta.json();
+
+    if (!resposta.ok) {
+      status.textContent = dados.erro || 'Não foi possível cadastrar o usuário.';
+      return;
+    }
+
+    status.textContent = dados.mensagem;
+    event.target.reset();
+    await carregarUsuarios();
+  } catch (erro) {
+    status.textContent = 'Falha de conexão com o servidor.';
+  }
+});
+
+carregarUsuarios();
+</script>
+<script src="acesso.js"></script>
+</body>
+</html>

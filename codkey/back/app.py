@@ -53,7 +53,7 @@ def acesso(perfis=None):
 PAGINAS_POR_PERFIL = {
     "admin": {
         "paginainicial.html", "aluno.html", "prof.html", "planos.html",
-        "pagamentos.html", "treino.html",
+        "pagamentos.html", "treino.html", "usuarios.html",
     },
     "professor": {"aluno.html", "treino.html"},
     "aluno": {"planos.html", "treino.html"},
@@ -174,16 +174,150 @@ def sessao_atual():
     return jsonify({"usuario": dict(g.usuario)})
 
 
+@app.route("/api/usuarios", methods=["GET", "POST", "PATCH"])
+@acesso(("admin",))
+def usuarios():
+    conexao = conectar()
+    try:
+        if request.method == "GET":
+            linhas = conexao.execute(
+                "SELECT id, nome, email, perfil FROM usuarios ORDER BY nome"
+            ).fetchall()
+            return jsonify([dict(linha) for linha in linhas])
+
+        dados = request.get_json(silent=True) or {}
+        if request.method == "POST":
+            nome = texto(dados.get("nome"))
+            email = texto(dados.get("email")).lower()
+            senha = texto(dados.get("senha"))
+            perfil = texto(dados.get("perfil")).lower()
+
+            if not nome or not email or len(senha) < 6:
+                return jsonify({"erro": "Informe nome, e-mail e uma senha com pelo menos 6 caracteres."}), 400
+            if perfil not in {"admin", "professor", "aluno"}:
+                return jsonify({"erro": "Selecione um cargo válido."}), 400
+
+            conexao.execute("BEGIN IMMEDIATE")
+            existente = conexao.execute(
+                "SELECT id FROM usuarios WHERE email = ?", (email,)
+            ).fetchone()
+            if existente:
+                return jsonify({"erro": "Este e-mail já está cadastrado."}), 409
+
+            cursor = conexao.execute(
+                "INSERT INTO usuarios (nome, email, senha, perfil) VALUES (?, ?, ?, ?)",
+                (nome, email, generate_password_hash(senha), perfil),
+            )
+            if perfil == "aluno":
+                aluno = conexao.execute(
+                    "SELECT id FROM alunos WHERE lower(email) = ?", (email,)
+                ).fetchone()
+                if not aluno:
+                    conexao.execute(
+                        "INSERT INTO alunos (nome, email) VALUES (?, ?)",
+                        (nome, email),
+                    )
+            elif perfil == "professor":
+                professor = conexao.execute(
+                    "SELECT id FROM professores WHERE lower(email) = ?", (email,)
+                ).fetchone()
+                if not professor:
+                    conexao.execute(
+                        "INSERT INTO professores (nome, email) VALUES (?, ?)",
+                        (nome, email),
+                    )
+
+            conexao.commit()
+            return jsonify({
+                "mensagem": f"{nome} foi cadastrado como {perfil}.",
+                "id": cursor.lastrowid,
+                "perfil": perfil,
+            }), 201
+
+        usuario_id = inteiro(dados.get("id"), "id")
+        perfil = texto(dados.get("perfil")).lower()
+        if usuario_id is None:
+            return jsonify({"erro": "Selecione um usuário válido."}), 400
+        if perfil not in {"admin", "professor", "aluno"}:
+            return jsonify({"erro": "O cargo informado é inválido."}), 400
+
+        conexao.execute("BEGIN IMMEDIATE")
+        usuario = conexao.execute(
+            "SELECT id, nome, email, perfil FROM usuarios WHERE id = ?",
+            (usuario_id,),
+        ).fetchone()
+        if not usuario:
+            return jsonify({"erro": "Usuário não encontrado."}), 404
+
+        if usuario["perfil"] == "admin" and perfil != "admin":
+            administradores = conexao.execute(
+                "SELECT COUNT(*) AS total FROM usuarios WHERE perfil = 'admin'"
+            ).fetchone()["total"]
+            if administradores <= 1:
+                return jsonify({"erro": "É necessário manter pelo menos um administrador."}), 400
+
+        conexao.execute(
+            "UPDATE usuarios SET perfil = ? WHERE id = ?",
+            (perfil, usuario_id),
+        )
+
+        professor = conexao.execute(
+            "SELECT id FROM professores WHERE lower(email) = ?",
+            (usuario["email"].lower(),),
+        ).fetchone()
+        if perfil == "professor" and not professor:
+            conexao.execute(
+                "INSERT INTO professores (nome, email) VALUES (?, ?)",
+                (usuario["nome"], usuario["email"]),
+            )
+
+        aluno = conexao.execute(
+            "SELECT id FROM alunos WHERE lower(email) = ?",
+            (usuario["email"].lower(),),
+        ).fetchone()
+        if perfil == "aluno" and not aluno:
+            conexao.execute(
+                "INSERT INTO alunos (nome, email) VALUES (?, ?)",
+                (usuario["nome"], usuario["email"]),
+            )
+
+        conexao.commit()
+        return jsonify({
+            "mensagem": f"Cargo atualizado para {perfil}.",
+            "id": usuario_id,
+            "perfil": perfil,
+        })
+    finally:
+        conexao.close()
+
+
 @app.route("/api/dashboard")
 @acesso(("admin",))
 def dashboard():
     conexao = conectar()
     try:
+        alunos_ativos = conexao.execute("""
+            SELECT COUNT(*) AS total FROM alunos
+            WHERE email IS NULL OR NOT EXISTS (
+                SELECT 1 FROM usuarios
+                WHERE lower(usuarios.email) = lower(alunos.email)
+                  AND usuarios.perfil != 'aluno'
+            )
+        """).fetchone()["total"]
+        professores_ativos = conexao.execute("""
+            SELECT COUNT(*) AS total FROM professores
+            WHERE email IS NULL OR NOT EXISTS (
+                SELECT 1 FROM usuarios
+                WHERE lower(usuarios.email) = lower(professores.email)
+                  AND usuarios.perfil != 'professor'
+            )
+        """).fetchone()["total"]
+
         def total(tabela):
             return conexao.execute(f"SELECT COUNT(*) AS total FROM {tabela}").fetchone()["total"]
         return jsonify({
-            "alunos": total("alunos"),
-            "professores": total("professores"),
+            "alunos": alunos_ativos,
+            "professores": professores_ativos,
             "planos": total("planos"),
             "pagamentos": total("pagamentos"),
             "treinos": total("treinos"),
@@ -198,7 +332,15 @@ def alunos():
     conexao = conectar()
     try:
         if request.method == "GET":
-            linhas = conexao.execute("SELECT * FROM alunos ORDER BY nome").fetchall()
+            linhas = conexao.execute("""
+                SELECT alunos.* FROM alunos
+                WHERE alunos.email IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM usuarios
+                    WHERE lower(usuarios.email) = lower(alunos.email)
+                      AND usuarios.perfil != 'aluno'
+                )
+                ORDER BY alunos.nome
+            """).fetchall()
             return jsonify([dict(linha) for linha in linhas])
 
         if g.usuario["perfil"] != "admin":
@@ -227,7 +369,15 @@ def professores():
     conexao = conectar()
     try:
         if request.method == "GET":
-            linhas = conexao.execute("SELECT * FROM professores ORDER BY nome").fetchall()
+            linhas = conexao.execute("""
+                SELECT professores.* FROM professores
+                WHERE professores.email IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM usuarios
+                    WHERE lower(usuarios.email) = lower(professores.email)
+                      AND usuarios.perfil != 'professor'
+                )
+                ORDER BY professores.nome
+            """).fetchall()
             return jsonify([dict(linha) for linha in linhas])
 
         dados = request.get_json(silent=True) or {}
@@ -397,11 +547,29 @@ def treinos():
             if not professor:
                 return jsonify({"erro": "Cadastro de professor não encontrado."}), 404
             professor_id = professor["id"]
-        aluno = conexao.execute("SELECT id FROM alunos WHERE id = ?", (aluno_id,)).fetchone()
+        aluno = conexao.execute("""
+            SELECT alunos.id FROM alunos
+            WHERE alunos.id = ? AND (
+                alunos.email IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM usuarios
+                    WHERE lower(usuarios.email) = lower(alunos.email)
+                      AND usuarios.perfil != 'aluno'
+                )
+            )
+        """, (aluno_id,)).fetchone()
         if not aluno:
             return jsonify({"erro": "Aluno não encontrado."}), 404
         if professor_id:
-            professor = conexao.execute("SELECT id FROM professores WHERE id = ?", (professor_id,)).fetchone()
+            professor = conexao.execute("""
+                SELECT professores.id FROM professores
+                WHERE professores.id = ? AND (
+                    professores.email IS NULL OR NOT EXISTS (
+                        SELECT 1 FROM usuarios
+                        WHERE lower(usuarios.email) = lower(professores.email)
+                          AND usuarios.perfil != 'professor'
+                    )
+                )
+            """, (professor_id,)).fetchone()
             if not professor:
                 return jsonify({"erro": "Professor não encontrado."}), 404
         cursor = conexao.execute("""
@@ -426,5 +594,6 @@ def erro_interno(_erro):
     return jsonify({"erro": "Erro interno do servidor."}), 500
 
 
+
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run()
